@@ -1,3 +1,4 @@
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -10,16 +11,18 @@ local player = Players.LocalPlayer
 local mouse = player:GetMouse()
 
 local settings = {
-    Enabled = false,
-    FOV = 100,
-    VisibleCheck = false,
-    AutoShoot = true,
-    ShootDelay = 0.1,
-    AimAtHead = true,
+    HitboxEnabled = false,
+    HitboxSize = 5,
+    AutoFire = false,
     KillAllEnabled = false,
-    ChamsEnabled = false,
-    AntiKill = false
+    SpeedEnabled = false,
+    SpinEnabled = false,
+    AntiKill = false,
+    ChamsEnabled = false
 }
+
+local bodyParts = {"Head"}
+local originalSizes = {} 
 
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "BANDITS9SCRIPT_GUI"
@@ -28,7 +31,6 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.DisplayOrder = 9999
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- Halloween decorations
 local halloweenEmojis = {"🎃", "👻", "🕷️"}
 local decorations = {}
 local decorationConnections = {}
@@ -52,7 +54,6 @@ local function createHalloweenDecorations()
         emoji.ZIndex = 9997
         emoji.Parent = ScreenGui
         
-        -- Анимация движения смайликов снизу вверх
         local startY = 1.1
         local endY = -0.1
         local speed = math.random(20, 40) / 100
@@ -108,7 +109,6 @@ local function showHalloweenDecorations()
         end
     end
     
-    -- Перезапускаем анимации
     for i, emoji in pairs(decorations) do
         if emoji and emoji.Parent then
             local startY = 1.1
@@ -162,7 +162,6 @@ UIStroke.Color = Color3.fromRGB(255, 140, 0)
 UIStroke.Thickness = 3
 UIStroke.Parent = MainFrame
 
--- Neon title effect
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 28)
 Title.Position = UDim2.new(0, 0, 0, 0)
@@ -176,7 +175,6 @@ Title.BorderSizePixel = 0
 Title.ZIndex = 10000
 Title.Parent = MainFrame
 
--- Neon text effect
 local TitleTextStroke = Instance.new("UIStroke")
 TitleTextStroke.Color = Color3.fromRGB(0, 0, 0)
 TitleTextStroke.Thickness = 2
@@ -288,13 +286,13 @@ local function addButtonToPage(page, name, x, y, w, h, textSize)
     return btn
 end
 
-addButtonToPage(pages["Main"], "AIMBOT: OFF", 10, 8, 160, 32, 14)
-addButtonToPage(pages["Main"], "KILL ALL: OFF", 10, 52, 160, 32, 14)
+addButtonToPage(pages["Main"], "HITBOX: OFF", 10, 8, 160, 32, 14)
+addButtonToPage(pages["Main"], "AUTO FIRE: OFF", 10, 52, 160, 32, 14)
+addButtonToPage(pages["Main"], "KILL ALL: OFF", 10, 96, 160, 32, 14)
 
-addButtonToPage(pages["Legit"], "WALL CHECK: OFF", 10, 8, 160, 32, 14)
-addButtonToPage(pages["Legit"], "SPEED: OFF", 10, 52, 160, 32, 14)
-addButtonToPage(pages["Legit"], "SPIN: OFF", 10, 96, 160, 32, 14)
-addButtonToPage(pages["Legit"], "ANTI KILL: OFF", 10, 140, 160, 32, 14)
+addButtonToPage(pages["Legit"], "SPEED: OFF", 10, 8, 160, 32, 14)
+addButtonToPage(pages["Legit"], "SPIN: OFF", 10, 52, 160, 32, 14)
+addButtonToPage(pages["Legit"], "ANTI KILL: OFF", 10, 96, 160, 32, 14)
 
 addButtonToPage(pages["ESP/CHAMS"], "CHAMS: OFF", 10, 8, 160, 32, 14)
 
@@ -321,30 +319,262 @@ creditsStroke.Color = Color3.fromRGB(255, 140, 0)
 creditsStroke.Thickness = 2
 creditsStroke.Parent = creditsLabel
 
--- Orange FOV Circle
-local FOVCircle = Instance.new("Frame")
-FOVCircle.Name = "FOVCircle"
-FOVCircle.Size = UDim2.new(0, settings.FOV * 2, 0, settings.FOV * 2)
-FOVCircle.Position = UDim2.new(0, mouse.X - settings.FOV, 0, mouse.Y - settings.FOV)
-FOVCircle.BackgroundColor3 = Color3.fromRGB(255, 165, 0)
-FOVCircle.BackgroundTransparency = 0.9
-FOVCircle.BorderSizePixel = 0
-FOVCircle.Visible = true
-FOVCircle.ZIndex = 9998
-FOVCircle.Parent = ScreenGui
-local CircleCorner = Instance.new("UICorner")
-CircleCorner.CornerRadius = UDim.new(1,0)
-CircleCorner.Parent = FOVCircle
-local CircleStroke = Instance.new("UIStroke")
-CircleStroke.Color = Color3.fromRGB(255, 140, 0)
-CircleStroke.Thickness = 2
-CircleStroke.Parent = FOVCircle
+local hitboxGUI
+local isHitboxGUIVisible = false
 
--- Rest of the code remains exactly the same...
+local function createHitboxGUI()
+    if hitboxGUI then
+        hitboxGUI:Destroy()
+    end
+    
+    hitboxGUI = Instance.new("ScreenGui")
+    hitboxGUI.Name = "HitboxSettingsGUI"
+    hitboxGUI.Parent = CoreGui
+    hitboxGUI.ResetOnSpawn = false
+
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 280, 0, 160)
+    frame.Position = UDim2.new(0.5, -140, 0.5, -80)
+    frame.BackgroundColor3 = Color3.fromRGB(40, 20, 0)
+    frame.Active = true
+    frame.Draggable = true
+    frame.Parent = hitboxGUI
+
+    local UICorner = Instance.new("UICorner")
+    UICorner.CornerRadius = UDim.new(0, 10)
+    UICorner.Parent = frame
+
+    local UIStroke = Instance.new("UIStroke")
+    UIStroke.Color = Color3.fromRGB(255, 140, 0)
+    UIStroke.Thickness = 3
+    UIStroke.Parent = frame
+
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, 0, 0, 30)
+    titleLabel.Position = UDim2.new(0, 0, 0, 0)
+    titleLabel.BackgroundColor3 = Color3.fromRGB(60, 30, 0)
+    titleLabel.Text = "🎃 РАЗМЕР ХИТБОКСА 🎃"
+    titleLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
+    titleLabel.Font = Enum.Font.SourceSansBold
+    titleLabel.TextSize = 14
+    titleLabel.Parent = frame
+
+    local titleTextStroke = Instance.new("UIStroke")
+    titleTextStroke.Color = Color3.fromRGB(0, 0, 0)
+    titleTextStroke.Thickness = 2
+    titleTextStroke.Parent = titleLabel
+
+    local titleCorner = Instance.new("UICorner")
+    titleCorner.CornerRadius = UDim.new(0, 10)
+    titleCorner.Parent = titleLabel
+
+    local sizeDisplay = Instance.new("TextLabel")
+    sizeDisplay.Size = UDim2.new(1, -20, 0, 20)
+    sizeDisplay.Position = UDim2.new(0, 10, 0, 35)
+    sizeDisplay.BackgroundTransparency = 1
+    sizeDisplay.Text = "Размер: " .. settings.HitboxSize
+    sizeDisplay.TextColor3 = Color3.fromRGB(255, 140, 0)
+    sizeDisplay.Font = Enum.Font.SourceSansBold
+    sizeDisplay.TextSize = 12
+    sizeDisplay.Parent = frame
+
+    local sizeTextStroke = Instance.new("UIStroke")
+    sizeTextStroke.Color = Color3.fromRGB(0, 0, 0)
+    sizeTextStroke.Thickness = 2
+    sizeTextStroke.Parent = sizeDisplay
+
+    local mainSliderFrame = Instance.new("Frame")
+    mainSliderFrame.Size = UDim2.new(0.9, 0, 0, 50)
+    mainSliderFrame.Position = UDim2.new(0.05, 0, 0, 60)
+    mainSliderFrame.BackgroundColor3 = Color3.fromRGB(80, 40, 0)
+    mainSliderFrame.Parent = frame
+
+    local mainSliderCorner = Instance.new("UICorner")
+    mainSliderCorner.CornerRadius = UDim.new(0, 8)
+    mainSliderCorner.Parent = mainSliderFrame
+
+    local mainSliderStroke = Instance.new("UIStroke")
+    mainSliderStroke.Color = Color3.fromRGB(255, 140, 0)
+    mainSliderStroke.Thickness = 2
+    mainSliderStroke.Parent = mainSliderFrame
+
+    local sliderLabel = Instance.new("TextLabel")
+    sliderLabel.Size = UDim2.new(1, 0, 0, 15)
+    sliderLabel.Position = UDim2.new(0, 0, 0, 2)
+    sliderLabel.BackgroundTransparency = 1
+    sliderLabel.Text = "РАЗМЕР ХИТБОКСА:"
+    sliderLabel.TextColor3 = Color3.fromRGB(255, 165, 0)
+    sliderLabel.Font = Enum.Font.SourceSansBold
+    sliderLabel.TextSize = 11
+    sliderLabel.Parent = mainSliderFrame
+
+    local sliderTextStroke = Instance.new("UIStroke")
+    sliderTextStroke.Color = Color3.fromRGB(0, 0, 0)
+    sliderTextStroke.Thickness = 1
+    sliderTextStroke.Parent = sliderLabel
+
+    local sliderBackground = Instance.new("Frame")
+    sliderBackground.Size = UDim2.new(0.8, 0, 0, 12)
+    sliderBackground.Position = UDim2.new(0.1, 0, 0, 20)
+    sliderBackground.BackgroundColor3 = Color3.fromRGB(100, 50, 0)
+    sliderBackground.Parent = mainSliderFrame
+
+    local sliderCorner = Instance.new("UICorner")
+    sliderCorner.CornerRadius = UDim.new(1, 0)
+    sliderCorner.Parent = sliderBackground
+
+    local sliderFill = Instance.new("Frame")
+    sliderFill.Size = UDim2.new((settings.HitboxSize - 1) / 19, 0, 1, 0)
+    sliderFill.BackgroundColor3 = Color3.fromRGB(255, 140, 0)
+    sliderFill.Parent = sliderBackground
+
+    local fillCorner = Instance.new("UICorner")
+    fillCorner.CornerRadius = UDim.new(1, 0)
+    fillCorner.Parent = sliderFill
+
+    local sliderButton = Instance.new("TextButton")
+    sliderButton.Size = UDim2.new(0, 20, 0, 20)
+    sliderButton.Position = UDim2.new((settings.HitboxSize - 1) / 19, -10, 0.5, -10)
+    sliderButton.BackgroundColor3 = Color3.fromRGB(255, 165, 0)
+    sliderButton.Text = "👻"
+    sliderButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+    sliderButton.Font = Enum.Font.SourceSansBold
+    sliderButton.TextSize = 10
+    sliderButton.AutoButtonColor = false
+    sliderButton.Parent = sliderBackground
+
+    local buttonTextStroke = Instance.new("UIStroke")
+    buttonTextStroke.Color = Color3.fromRGB(0, 0, 0)
+    buttonTextStroke.Thickness = 2
+    buttonTextStroke.Parent = sliderButton
+
+    local buttonCorner = Instance.new("UICorner")
+    buttonCorner.CornerRadius = UDim.new(1, 0)
+    buttonCorner.Parent = sliderButton
+
+    local closeButton = Instance.new("TextButton")
+    closeButton.Size = UDim2.new(0.8, 0, 0, 30)
+    closeButton.Position = UDim2.new(0.1, 0, 0, 120)
+    closeButton.BackgroundColor3 = Color3.fromRGB(120, 60, 0)
+    closeButton.Text = "ЗАКРЫТЬ"
+    closeButton.TextColor3 = Color3.fromRGB(255, 140, 0)
+    closeButton.Font = Enum.Font.SourceSansBold
+    closeButton.TextSize = 12
+    closeButton.Parent = frame
+
+    local closeTextStroke = Instance.new("UIStroke")
+    closeTextStroke.Color = Color3.fromRGB(0, 0, 0)
+    closeTextStroke.Thickness = 2
+    closeTextStroke.Parent = closeButton
+
+    local closeCorner = Instance.new("UICorner")
+    closeCorner.CornerRadius = UDim.new(0, 8)
+    closeCorner.Parent = closeButton
+
+    sliderButton.MouseButton1Down:Connect(function()
+        local connection
+        connection = UserInputService.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement then
+                local relativeX = math.clamp(input.Position.X - sliderBackground.AbsolutePosition.X, 0, sliderBackground.AbsoluteSize.X)
+                local newSize = math.floor((relativeX / sliderBackground.AbsoluteSize.X) * 19) + 1
+                
+                settings.HitboxSize = newSize
+                sliderButton.Position = UDim2.new(relativeX / sliderBackground.AbsoluteSize.X, -10, 0.5, -10)
+                sliderFill.Size = UDim2.new(relativeX / sliderBackground.AbsoluteSize.X, 0, 1, 0)
+                sizeDisplay.Text = "Размер: " .. newSize
+            end
+        end)
+
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                connection:Disconnect()
+            end
+        end)
+    end)
+
+    closeButton.MouseButton1Click:Connect(function()
+        hitboxGUI.Enabled = false
+        isHitboxGUIVisible = false
+    end)
+
+    return hitboxGUI
+end
+
+local function ResizeBodyPart(targetPlayer, partName, size)
+    if targetPlayer == player then return end  
+    if not settings.HitboxEnabled then return end
+
+    local character = targetPlayer.Character
+    if not character then return end
+
+    local part = character:FindFirstChild(partName)
+    if not part then return end
+
+    if not originalSizes[part] then
+        originalSizes[part] = part.Size
+    end
+
+    local minSize = 1
+    local newSize = math.max(size, minSize)
+
+    part.Size = Vector3.new(newSize, newSize, newSize)
+    part.Transparency = 0.3
+    part.CanCollide = false
+    part.Massless = true
+    part.BrickColor = BrickColor.new("Bright orange")
+    part.Material = Enum.Material.Neon
+
+    if not part:FindFirstChild("HitboxLight") then
+        local pointLight = Instance.new("PointLight")
+        pointLight.Name = "HitboxLight"
+        pointLight.Brightness = 3
+        pointLight.Range = 15
+        pointLight.Color = Color3.fromRGB(255, 140, 0)
+        pointLight.Parent = part
+    end
+end
+
+local function ResetBodyPart(targetPlayer, partName)
+    local character = targetPlayer.Character
+    if not character then return end
+
+    local part = character:FindFirstChild(partName)
+    if not part then return end
+
+    if originalSizes[part] then
+        part.Size = originalSizes[part]
+        part.Transparency = 0
+        part.CanCollide = true
+        part.BrickColor = BrickColor.new("Medium stone grey")
+        part.Material = Enum.Material.Plastic
+        
+        local light = part:FindFirstChild("HitboxLight")
+        if light then
+            light:Destroy()
+        end
+    end
+end
+
+local function updateOtherPlayers()
+    for _, otherPlayer in ipairs(Players:GetPlayers()) do
+        if otherPlayer ~= player and otherPlayer.Character then
+            for _, partName in ipairs(bodyParts) do
+                if settings.HitboxEnabled then
+                    ResizeBodyPart(otherPlayer, partName, settings.HitboxSize)
+                else
+                    ResetBodyPart(otherPlayer, partName)
+                end
+            end
+        end
+    end
+end
+
+RunService.Heartbeat:Connect(function()
+    updateOtherPlayers()
+end)
+
 local chamsEnabled = false
 local highlights = {}
-local healthConnections = {}
-local lastHealth = {}
 
 local function createHighlightForPlayer(targetPlayer, character)
     if not character or not targetPlayer or targetPlayer == player then return end
@@ -352,11 +582,6 @@ local function createHighlightForPlayer(targetPlayer, character)
     if highlights[targetPlayer] then
         highlights[targetPlayer]:Destroy()
         highlights[targetPlayer] = nil
-    end
-    
-    if healthConnections[targetPlayer] then
-        healthConnections[targetPlayer]:Disconnect()
-        healthConnections[targetPlayer] = nil
     end
     
     local highlight = Instance.new("Highlight")
@@ -369,32 +594,6 @@ local function createHighlightForPlayer(targetPlayer, character)
     highlight.Adornee = character
     highlight.Parent = ScreenGui
     highlights[targetPlayer] = highlight
-    
-    local humanoid = character:WaitForChild("Humanoid", 5)
-    if humanoid then
-        lastHealth[targetPlayer] = humanoid.Health
-        
-        healthConnections[targetPlayer] = humanoid.HealthChanged:Connect(function(newHealth)
-            local oldHealth = lastHealth[targetPlayer] or newHealth
-            
-            if newHealth < oldHealth then
-                local highlight = highlights[targetPlayer]
-                if highlight and highlight.Parent then
-                    highlight.FillColor = Color3.fromRGB(255, 69, 0)
-                    highlight.OutlineColor = Color3.fromRGB(255, 69, 0)
-                    
-                    task.delay(0.5, function()
-                        if highlight and highlight.Parent then
-                            highlight.FillColor = Color3.fromRGB(255, 165, 0)
-                            highlight.OutlineColor = Color3.fromRGB(255, 140, 0)
-                        end
-                    end)
-                end
-            end
-            
-            lastHealth[targetPlayer] = newHealth
-        end)
-    end
 end
 
 local function setupPlayer(targetPlayer)
@@ -429,14 +628,6 @@ local function enableChams()
     end
     highlights = {}
     
-    for targetPlayer, connection in pairs(healthConnections) do
-        if connection then
-            connection:Disconnect()
-        end
-    end
-    healthConnections = {}
-    lastHealth = {}
-    
     for _, targetPlayer in pairs(Players:GetPlayers()) do
         if targetPlayer ~= player then
             setupPlayer(targetPlayer)
@@ -447,18 +638,6 @@ local function enableChams()
         if chamsEnabled then
             setupPlayer(newPlayer)
         end
-    end)
-    
-    Players.PlayerRemoving:Connect(function(leftPlayer)
-        if highlights[leftPlayer] then
-            highlights[leftPlayer]:Destroy()
-            highlights[leftPlayer] = nil
-        end
-        if healthConnections[leftPlayer] then
-            healthConnections[leftPlayer]:Disconnect()
-            healthConnections[leftPlayer] = nil
-        end
-        lastHealth[leftPlayer] = nil
     end)
 end
 
@@ -473,14 +652,157 @@ local function disableChams()
         end
     end
     highlights = {}
-    
-    for targetPlayer, connection in pairs(healthConnections) do
-        if connection then
-            connection:Disconnect()
-        end
+end
+
+local autoFireConnection
+local isMouseHeld = false
+
+local function holdLeftMouseButton()
+    if not isMouseHeld then
+        VirtualInputManager:SendMouseButtonEvent(mouse.X, mouse.Y, 0, true, game, 1)
+        isMouseHeld = true
     end
-    healthConnections = {}
-    lastHealth = {}
+end
+
+local function releaseLeftMouseButton()
+    if isMouseHeld then
+        VirtualInputManager:SendMouseButtonEvent(mouse.X, mouse.Y, 0, false, game, 1)
+        isMouseHeld = false
+    end
+end
+
+local function startAutoFire()
+    if autoFireConnection then autoFireConnection:Disconnect() end
+    
+    autoFireConnection = RunService.Heartbeat:Connect(function()
+        if not settings.AutoFire then 
+            releaseLeftMouseButton()
+            return 
+        end
+        holdLeftMouseButton()
+    end)
+end
+
+local killAllConnection
+
+local function startKillAll()
+    if killAllConnection then 
+        killAllConnection:Disconnect()
+        killAllConnection = nil
+    end
+    
+    if not settings.KillAllEnabled then return end
+    
+    killAllConnection = RunService.Heartbeat:Connect(function()
+        if not settings.KillAllEnabled then
+            if killAllConnection then
+                killAllConnection:Disconnect()
+                killAllConnection = nil
+            end
+            return
+        end
+        
+        local targetPlayer = nil
+        for _, v in pairs(Players:GetPlayers()) do
+            if v ~= player and v.Character then
+                local humanoid = v.Character:FindFirstChild("Humanoid")
+                if humanoid and humanoid.Health > 0 then
+                    targetPlayer = v
+                    break
+                end
+            end
+        end
+        
+        if targetPlayer and targetPlayer.Character then
+            settings.AutoFire = true
+            startAutoFire()
+        else
+            settings.KillAllEnabled = false
+            settings.AutoFire = false
+            buttonInstances["KILL ALL: OFF"].Text = "KILL ALL: OFF"
+            buttonInstances["KILL ALL: OFF"].BackgroundColor3 = Color3.fromRGB(120, 60, 0)
+            buttonInstances["AUTO FIRE: OFF"].Text = "AUTO FIRE: OFF"
+            buttonInstances["AUTO FIRE: OFF"].BackgroundColor3 = Color3.fromRGB(120, 60, 0)
+            releaseLeftMouseButton()
+        end
+    end)
+end
+
+local speedConnection
+local isSpeedActive = false
+
+local function startSpeedGlitch()
+    if speedConnection then speedConnection:Disconnect() end
+    isSpeedActive = true
+    
+    speedConnection = RunService.Heartbeat:Connect(function()
+        local character = player.Character
+        if character and isSpeedActive then
+            local humanoid = character:FindFirstChild("Humanoid")
+            if humanoid then
+                humanoid.WalkSpeed = 50
+            end
+        end
+    end)
+end
+
+local spinConnection
+local isSpinActive = false
+
+local function startSpin()
+    if spinConnection then spinConnection:Disconnect() end
+    isSpinActive = true
+    
+    spinConnection = RunService.Heartbeat:Connect(function()
+        local character = player.Character
+        if character and isSpinActive then
+            local rootPart = character:FindFirstChild("HumanoidRootPart")
+            if rootPart then
+                local currentCFrame = rootPart.CFrame
+                local newRotation = currentCFrame * CFrame.Angles(0, math.rad(10), 0)
+                rootPart.CFrame = newRotation
+            end
+        end
+    end)
+end
+
+local antiKillConnection
+local safePosition = Vector3.new(0, 25, 0)
+local lastPlayerHealth = 100
+
+local function teleportToSafePosition()
+    pcall(function()
+        if player.Character then
+            local root = player.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                root.CFrame = CFrame.new(safePosition)
+            end
+        end
+    end)
+end
+
+local function startAntiKill()
+    if antiKillConnection then 
+        antiKillConnection:Disconnect()
+        antiKillConnection = nil
+    end
+    
+    antiKillConnection = RunService.Heartbeat:Connect(function()
+        pcall(function()
+            if player.Character and settings.AntiKill then
+                local humanoid = player.Character:FindFirstChild("Humanoid")
+                if humanoid then
+                    local currentHealth = humanoid.Health
+                    
+                    if currentHealth < lastPlayerHealth then
+                        teleportToSafePosition()
+                    end
+                    
+                    lastPlayerHealth = currentHealth
+                end
+            end
+        end)
+    end)
 end
 
 local isGUIVisible = true
@@ -493,7 +815,6 @@ local function hideGUI()
     
     savedPosition = MainFrame.Position
     
-    -- Скрываем смайлики при скрытии GUI
     hideHalloweenDecorations()
     
     local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
@@ -537,7 +858,6 @@ local function showGUI()
     MainFrame.Visible = true
     MainFrame.Position = savedPosition
     
-    -- Показываем смайлики при показе GUI
     showHalloweenDecorations()
     
     local tweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
@@ -611,334 +931,44 @@ for name, btn in pairs(tabButtons) do
     end)
 end
 
-local aimbotConnection, speedConnection, spinConnection, killAllConnection, antiKillConnection
-local isSpeedActive, isSpinActive = false, false
-local currentTarget = nil
-local isMouseHeld = false
-local lastShootTime = 0
-
-local function holdLeftMouseButton()
-    if not isMouseHeld then
-        VirtualInputManager:SendMouseButtonEvent(mouse.X, mouse.Y, 0, true, game, 1)
-        isMouseHeld = true
-    end
-end
-
-local function releaseLeftMouseButton()
-    if isMouseHeld then
-        VirtualInputManager:SendMouseButtonEvent(mouse.X, mouse.Y, 0, false, game, 1)
-        isMouseHeld = false
-    end
-end
-
-local function isPlayerVisible(targetPlayer)
-    if not settings.VisibleCheck then return true end
-    local camera = Workspace.CurrentCamera
-    local targetCharacter = targetPlayer.Character
-    if not targetCharacter then return false end
-    
-    local head = targetCharacter:FindFirstChild("Head")
-    if not head then return false end
-    
-    local rayOrigin = camera.CFrame.Position
-    local rayDirection = (head.Position - rayOrigin).Unit * 1000
-    
-    local ray = Ray.new(rayOrigin, rayDirection)
-    local ignoreList = {player.Character, camera}
-    local hit, hitPosition = Workspace:FindPartOnRayWithIgnoreList(ray, ignoreList)
-    
-    if hit then
-        local hitCharacter = hit:FindFirstAncestorOfClass("Model")
-        return hitCharacter == targetCharacter
-    end
-    
-    return false
-end
-
-local function getClosestPlayerInFOV()
-    local closestPlayer, closestDistance = nil, settings.FOV
-    local camera = Workspace.CurrentCamera
-    
-    for _, v in pairs(Players:GetPlayers()) do
-        if v == player then continue end
-        if not v.Character then continue end
-        
-        local humanoid = v.Character:FindFirstChild("Humanoid")
-        if not humanoid or humanoid.Health <= 0 then continue end
-        
-        local head = v.Character:FindFirstChild("Head")
-        if not head then continue end
-        
-        local screenPoint, onScreen = camera:WorldToViewportPoint(head.Position)
-        
-        if onScreen then
-            local mousePos = Vector2.new(mouse.X, mouse.Y)
-            local playerPos = Vector2.new(screenPoint.X, screenPoint.Y)
-            local distance = (mousePos - playerPos).Magnitude
-            
-            if distance <= closestDistance then
-                local isVisible = isPlayerVisible(v)
-                if isVisible then
-                    closestDistance, closestPlayer = distance, v
-                end
-            end
+buttonInstances["HITBOX: OFF"].MouseButton1Click:Connect(function()
+    settings.HitboxEnabled = not settings.HitboxEnabled
+    if settings.HitboxEnabled then
+        buttonInstances["HITBOX: OFF"].Text = "HITBOX: ON"
+        buttonInstances["HITBOX: OFF"].BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+        if not isHitboxGUIVisible then
+            createHitboxGUI()
+            hitboxGUI.Enabled = true
+            isHitboxGUIVisible = true
         end
-    end
-    return closestPlayer, closestDistance
-end
-
-local function aimAtPlayer(target)
-    if not target or not target.Character then 
-        releaseLeftMouseButton()
-        return false 
-    end
-    
-    local camera = Workspace.CurrentCamera
-    local targetCharacter = target.Character
-    
-    local head = targetCharacter:FindFirstChild("Head")
-    if not head then 
-        releaseLeftMouseButton()
-        return false 
-    end
-    
-    local targetPosition = head.Position
-    
-    local currentCFrame = camera.CFrame
-    local targetCFrame = CFrame.lookAt(currentCFrame.Position, targetPosition)
-    camera.CFrame = currentCFrame:Lerp(targetCFrame, 0.9)
-    
-    if settings.AutoShoot then
-        local currentTime = tick()
-        if currentTime - lastShootTime >= settings.ShootDelay then
-            holdLeftMouseButton()
-            lastShootTime = currentTime
-        end
-    end
-    
-    return true
-end
-
-local function startAimbot()
-    if aimbotConnection then aimbotConnection:Disconnect() end
-    
-    aimbotConnection = RunService.RenderStepped:Connect(function()
-        if not settings.Enabled then 
-            FOVCircle.UIStroke.Color = Color3.fromRGB(255, 140, 0)
-            releaseLeftMouseButton()
-            return 
-        end
-        
-        local closestPlayer, distance = getClosestPlayerInFOV()
-        if closestPlayer then
-            local success = aimAtPlayer(closestPlayer)
-            if success then
-                FOVCircle.UIStroke.Color = Color3.fromRGB(50, 255, 50)
-                currentTarget = closestPlayer
-            else
-                FOVCircle.UIStroke.Color = Color3.fromRGB(255, 255, 0)
-                releaseLeftMouseButton()
-            end
-        else
-            FOVCircle.UIStroke.Color = Color3.fromRGB(255, 140, 0)
-            releaseLeftMouseButton()
-            currentTarget = nil
-        end
-    end)
-end
-
-local function getRandomAlivePlayer()
-    local alivePlayers = {}
-    for _, v in pairs(Players:GetPlayers()) do
-        if v == player then continue end
-        if not v.Character then continue end
-        local humanoid = v.Character:FindFirstChild("Humanoid")
-        if humanoid and humanoid.Health > 0 then
-            table.insert(alivePlayers, v)
-        end
-    end
-    return #alivePlayers > 0 and alivePlayers[math.random(1, #alivePlayers)] or nil
-end
-
-local function teleportToPlayer(targetPlayer)
-    if not targetPlayer or not targetPlayer.Character then return false end
-    local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-    local myRoot = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-    if targetRoot and myRoot then
-        local offset = Vector3.new(math.random(-5, 5), 0, math.random(-5, 5))
-        myRoot.CFrame = targetRoot.CFrame + offset
-        return true
-    end
-    return false
-end
-
-local function isPlayerAlive(targetPlayer)
-    if not targetPlayer or not targetPlayer.Character then return false end
-    local humanoid = targetPlayer.Character:FindFirstChild("Humanoid")
-    return humanoid and humanoid.Health > 0
-end
-
-local function startSpeedGlitch()
-    if speedConnection then speedConnection:Disconnect() end
-    isSpeedActive = true
-    
-    speedConnection = RunService.Heartbeat:Connect(function()
-        local character = player.Character
-        if character and isSpeedActive then
-            local humanoid = character:FindFirstChild("Humanoid")
-            local rootPart = character:FindFirstChild("HumanoidRootPart")
-            if humanoid and rootPart then
-                humanoid.WalkSpeed = 100
-                if humanoid.Jump then
-                    local camera = Workspace.CurrentCamera
-                    local direction = camera.CFrame.LookVector
-                    rootPart.Velocity = rootPart.Velocity + direction * 100
-                end
-            end
-        end
-    end)
-end
-
-local function startSpin()
-    if spinConnection then spinConnection:Disconnect() end
-    isSpinActive = true
-    
-    spinConnection = RunService.Heartbeat:Connect(function()
-        local character = player.Character
-        if character and isSpinActive then
-            local rootPart = character:FindFirstChild("HumanoidRootPart")
-            if rootPart then
-                local currentCFrame = rootPart.CFrame
-                local newRotation = currentCFrame * CFrame.Angles(0, math.rad(50), 0)
-                rootPart.CFrame = newRotation
-            end
-        end
-    end)
-end
-
-local function startKillAll()
-    if killAllConnection then 
-        killAllConnection:Disconnect()
-        killAllConnection = nil
-    end
-    
-    if not settings.KillAllEnabled then return end
-    
-    currentTarget = getRandomAlivePlayer()
-    if not currentTarget then
-        settings.KillAllEnabled = false
-        buttonInstances["KILL ALL: OFF"].Text = "KILL ALL: OFF"
-        buttonInstances["KILL ALL: OFF"].BackgroundColor3 = Color3.fromRGB(120, 60, 0)
-        return
-    end
-    
-    teleportToPlayer(currentTarget)
-
-    killAllConnection = RunService.Heartbeat:Connect(function()
-        if not settings.KillAllEnabled then
-            if killAllConnection then
-                killAllConnection:Disconnect()
-                killAllConnection = nil
-            end
-            return
-        end
-        
-        if not isPlayerAlive(currentTarget) then
-            currentTarget = getRandomAlivePlayer()
-            if currentTarget then
-                teleportToPlayer(currentTarget)
-            else
-                settings.KillAllEnabled = false
-                buttonInstances["KILL ALL: OFF"].Text = "KILL ALL: OFF"
-                buttonInstances["KILL ALL: OFF"].BackgroundColor3 = Color3.fromRGB(120, 60, 0)
-                return
-            end
-        end
-        
-        local myCharacter = player.Character
-        local myRoot = myCharacter and myCharacter:FindFirstChild("HumanoidRootPart")
-        local targetRoot = currentTarget.Character and currentTarget.Character:FindFirstChild("HumanoidRootPart")
-        
-        if myRoot and targetRoot then
-            local angle = tick() * 10
-            local radius = 5
-            local x, z = math.cos(angle) * radius, math.sin(angle) * radius
-            local offset = Vector3.new(x, 0, z)
-            myRoot.CFrame = CFrame.new(targetRoot.Position + offset, targetRoot.Position)
-            
-            VirtualInputManager:SendMouseButtonEvent(mouse.X, mouse.Y, 0, true, game, 1)
-            task.wait(0.1)
-            VirtualInputManager:SendMouseButtonEvent(mouse.X, mouse.Y, 0, false, game, 1)
-        end
-    end)
-end
-
-local safePosition = Vector3.new(15, 25, 469)
-local lastPlayerHealth = 100
-
-local function teleportToSafePosition()
-    pcall(function()
-        if player.Character then
-            local root = player.Character:FindFirstChild("HumanoidRootPart")
-            if root then
-                root.CFrame = CFrame.new(safePosition)
-            end
-        end
-    end)
-end
-
-local function startAntiKill()
-    if antiKillConnection then 
-        antiKillConnection:Disconnect()
-        antiKillConnection = nil
-    end
-    
-    antiKillConnection = RunService.Heartbeat:Connect(function()
-        pcall(function()
-            if player.Character and settings.AntiKill then
-                local humanoid = player.Character:FindFirstChild("Humanoid")
-                if humanoid then
-                    local currentHealth = humanoid.Health
-                    
-                    if currentHealth < lastPlayerHealth then
-                        teleportToSafePosition()
-                    end
-                    
-                    lastPlayerHealth = currentHealth
-                end
-            end
-        end)
-    end)
-    
-    player.CharacterAdded:Connect(function(char)
-        wait(2)
-        lastPlayerHealth = 100
-        
-        local humanoid = char:WaitForChild("Humanoid")
-        
-        while settings.AntiKill do
-            wait(0.01)
-            if humanoid.Health < lastPlayerHealth then
-                teleportToSafePosition()
-                lastPlayerHealth = humanoid.Health
-            end
-            lastPlayerHealth = humanoid.Health
-        end
-    end)
-end
-
-buttonInstances["AIMBOT: OFF"].MouseButton1Click:Connect(function()
-    settings.Enabled = not settings.Enabled
-    if settings.Enabled then
-        buttonInstances["AIMBOT: OFF"].Text = "AIMBOT: ON"
-        buttonInstances["AIMBOT: OFF"].BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-        startAimbot()
     else
-        buttonInstances["AIMBOT: OFF"].Text = "AIMBOT: OFF"
-        buttonInstances["AIMBOT: OFF"].BackgroundColor3 = Color3.fromRGB(120, 60, 0)
-        if aimbotConnection then aimbotConnection:Disconnect() end
+        buttonInstances["HITBOX: OFF"].Text = "HITBOX: OFF"
+        buttonInstances["HITBOX: OFF"].BackgroundColor3 = Color3.fromRGB(120, 60, 0)
+        for _, otherPlayer in ipairs(Players:GetPlayers()) do
+            if otherPlayer ~= player then
+                ResetBodyPart(otherPlayer, "Head")
+            end
+        end
+        if hitboxGUI then
+            hitboxGUI.Enabled = false
+        end
+    end
+end)
+
+buttonInstances["AUTO FIRE: OFF"].MouseButton1Click:Connect(function()
+    settings.AutoFire = not settings.AutoFire
+    if settings.AutoFire then
+        buttonInstances["AUTO FIRE: OFF"].Text = "AUTO FIRE: ON"
+        buttonInstances["AUTO FIRE: OFF"].BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+        startAutoFire()
+    else
+        buttonInstances["AUTO FIRE: OFF"].Text = "AUTO FIRE: OFF"
+        buttonInstances["AUTO FIRE: OFF"].BackgroundColor3 = Color3.fromRGB(120, 60, 0)
+        if autoFireConnection then
+            autoFireConnection:Disconnect()
+            autoFireConnection = nil
+        end
         releaseLeftMouseButton()
-        FOVCircle.UIStroke.Color = Color3.fromRGB(255, 140, 0)
     end
 end)
 
@@ -956,17 +986,10 @@ buttonInstances["KILL ALL: OFF"].MouseButton1Click:Connect(function()
             killAllConnection:Disconnect()
             killAllConnection = nil
         end
-    end
-end)
-
-buttonInstances["WALL CHECK: OFF"].MouseButton1Click:Connect(function()
-    settings.VisibleCheck = not settings.VisibleCheck
-    if settings.VisibleCheck then
-        buttonInstances["WALL CHECK: OFF"].Text = "WALL CHECK: ON"
-        buttonInstances["WALL CHECK: OFF"].BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-    else
-        buttonInstances["WALL CHECK: OFF"].Text = "WALL CHECK: OFF"
-        buttonInstances["WALL CHECK: OFF"].BackgroundColor3 = Color3.fromRGB(120, 60, 0)
+        settings.AutoFire = false
+        buttonInstances["AUTO FIRE: OFF"].Text = "AUTO FIRE: OFF"
+        buttonInstances["AUTO FIRE: OFF"].BackgroundColor3 = Color3.fromRGB(120, 60, 0)
+        releaseLeftMouseButton()
     end
 end)
 
@@ -1031,17 +1054,22 @@ buttonInstances["CHAMS: OFF"].MouseButton1Click:Connect(function()
     end
 end)
 
-mouse.Move:Connect(function()
-    FOVCircle.Position = UDim2.new(0, mouse.X - settings.FOV, 0, mouse.Y - settings.FOV)
-end)
-
 player.CharacterAdded:Connect(function(character)
-    if settings.Enabled then
-        task.wait(2)
-        startAimbot()
-    end
     if settings.AntiKill then
         task.wait(2)
         startAntiKill()
     end
+    if isSpeedActive then
+        task.wait(2)
+        startSpeedGlitch()
+    end
+    if settings.ChamsEnabled then
+        enableChams()
+    end
 end)
+
+for _, otherPlayer in ipairs(Players:GetPlayers()) do
+    if otherPlayer ~= player then
+        setupPlayer(otherPlayer)
+    end
+end
